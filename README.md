@@ -6,7 +6,9 @@
 
 ## Overview
 
-This is a fork of the [original](https://github.com/shipgirlproject/Shoukaku) with an attempt to make it solely compatible with [Bun](https://bun.sh/) and [Discord.js](https://discord.js.org/). This is not intended for public use and is only for personal use. Although, you are free to use it if you wish.
+This is a fork of the [original](https://github.com/shipgirlproject/Shoukaku) with an attempt to make it solely compatible with [Bun](https://bun.sh/) and [Discord.js](https://discord.js.org/).
+
+This is not intended for public use and is only for personal use. Although, you are free to use it if you wish.
 
 ## License
 
