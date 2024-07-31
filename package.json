@@ -1,7 +1,7 @@
 {
-  "name": "shoukaku",
+  "name": "@i9ntheory/shoukaku",
   "version": "4.0.1",
-  "description": "A stable and updated wrapper around Lavalink",
+  "description": "A stable, powerful, and updated wrapper around Lavalink.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
