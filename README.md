@@ -1,4 +1,4 @@
->  *The melody of my flute is a requiem for the dead. Shall I play it for you?*
+> _~The melody of my flute is a requiem for the dead. Shall I play it for you?_
 
 ![Header](.github/assets/banner.png)
 

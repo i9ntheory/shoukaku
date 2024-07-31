@@ -1,6 +1,6 @@
-import { EventEmitter, once } from 'events';
-import { State, VoiceState } from '../Constants';
-import { Shoukaku, VoiceChannelOptions } from '../Shoukaku.js';
+import { AsyncEventEmitter } from "@vladfrangu/async_event_emitter";
+import { State, VoiceState } from "../Constants";
+import type { Shoukaku, VoiceChannelOptions } from "../Shoukaku.js";
 
 /**
  * Represents the partial payload from a stateUpdate event
@@ -24,7 +24,7 @@ export interface ServerUpdate {
 /**
  * Represents a connection to a Discord voice channel
  */
-export class Connection extends EventEmitter {
+export class Connection extends AsyncEventEmitter<{ connectionUpdate: [number] }> {
     /**
      * The manager where this connection is on
      */
@@ -36,7 +36,7 @@ export class Connection extends EventEmitter {
     /**
      * VoiceChannelId of the connection that is being managed by this instance
      */
-    public channelId: string|null;
+    public channelId: string | null;
 
     /**
      * ShardId where this connection sends data on
@@ -53,23 +53,23 @@ export class Connection extends EventEmitter {
     /**
      * Id of the voice channel where this instance was connected before the current channelId
      */
-    public lastChannelId: string|null;
+    public lastChannelId: string | null;
     /**
      * Id of the currently active voice channel connection
      */
-    public sessionId: string|null;
+    public sessionId: string | null;
     /**
      * Region of connected voice channel
      */
-    public region: string|null;
+    public region: string | null;
     /**
      * Last region of the connected voice channel
      */
-    public lastRegion: string|null;
+    public lastRegion: string | null;
     /**
      * Cached serverUpdate event from Lavalink
      */
-    public serverUpdate: ServerUpdate|null;
+    public serverUpdate: ServerUpdate | null;
     /**
      * Connection state
      */
@@ -149,18 +149,37 @@ export class Connection extends EventEmitter {
         const timeout = setTimeout(() => controller.abort(), this.manager.options.voiceConnectionTimeout * 1000);
 
         try {
-            const [ status ] = await once(this, 'connectionUpdate', { signal: controller.signal });
+            const status = await new Promise<number>((resolve, reject) => {
+                const handleConnectionUpdate = (status: number) => {
+                    this.off("connectionUpdate", handleConnectionUpdate);
+                    resolve(status);
+                };
+
+                this.once("connectionUpdate", handleConnectionUpdate);
+
+                controller.signal.addEventListener("abort", () => {
+                    this.off("connectionUpdate", handleConnectionUpdate);
+                    reject(new Error("Connection timeout"));
+                });
+            });
+
             if (status !== VoiceState.SESSION_READY) {
-                switch(status) {
-                    case VoiceState.SESSION_ID_MISSING: throw new Error('The voice connection is not established due to missing session id');
-                    case VoiceState.SESSION_ENDPOINT_MISSING: throw new Error('The voice connection is not established due to missing connection endpoint');
+                switch (status) {
+                    case VoiceState.SESSION_ID_MISSING:
+                        throw new Error("The voice connection is not established due to missing session id");
+                    case VoiceState.SESSION_ENDPOINT_MISSING:
+                        throw new Error("The voice connection is not established due to missing connection endpoint");
                 }
             }
             this.state = State.CONNECTED;
+
+            // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         } catch (error: any) {
             this.debug(`[Voice] </- [Discord] : Request Connection Failed | Guild: ${this.guildId}`);
-            if (error.name === 'AbortError')
-                throw new Error(`The voice connection is not established in ${this.manager.options.voiceConnectionTimeout} seconds`);
+            if (error.name === "AbortError")
+                throw new Error(
+                    `The voice connection is not established in ${this.manager.options.voiceConnectionTimeout} seconds`,
+                );
             throw error;
         } finally {
             clearTimeout(timeout);
@@ -192,7 +211,9 @@ export class Connection extends EventEmitter {
         this.deafened = self_deaf;
         this.muted = self_mute;
         this.sessionId = session_id || null;
-        this.debug(`[Voice] <- [Discord] : State Update Received | Channel: ${this.channelId} Session ID: ${session_id} Guild: ${this.guildId}`);
+        this.debug(
+            `[Voice] <- [Discord] : State Update Received | Channel: ${this.channelId} Session ID: ${session_id} Guild: ${this.guildId}`,
+        );
     }
 
     /**
@@ -201,23 +222,25 @@ export class Connection extends EventEmitter {
      */
     public setServerUpdate(data: ServerUpdate): void {
         if (!data.endpoint) {
-            this.emit('connectionUpdate', VoiceState.SESSION_ENDPOINT_MISSING);
+            this.emit("connectionUpdate", VoiceState.SESSION_ENDPOINT_MISSING);
             return;
         }
         if (!this.sessionId) {
-            this.emit('connectionUpdate', VoiceState.SESSION_ID_MISSING);
+            this.emit("connectionUpdate", VoiceState.SESSION_ID_MISSING);
             return;
         }
 
         this.lastRegion = this.region?.repeat(1) || null;
-        this.region = data.endpoint.split('.').shift()?.replace(/[0-9]/g, '') || null;
+        this.region = data.endpoint.split(".").shift()?.replace(/[0-9]/g, "") || null;
 
         if (this.region && this.lastRegion !== this.region) {
-            this.debug(`[Voice] <- [Discord] : Voice Region Moved | Old Region: ${this.lastRegion} New Region: ${this.region} Guild: ${this.guildId}`);
+            this.debug(
+                `[Voice] <- [Discord] : Voice Region Moved | Old Region: ${this.lastRegion} New Region: ${this.region} Guild: ${this.guildId}`,
+            );
         }
 
         this.serverUpdate = data;
-        this.emit('connectionUpdate', VoiceState.SESSION_READY);
+        this.emit("connectionUpdate", VoiceState.SESSION_READY);
         this.debug(`[Voice] <- [Discord] : Server Update Received | Server: ${this.region} Guild: ${this.guildId}`);
     }
 
@@ -226,7 +249,12 @@ export class Connection extends EventEmitter {
      * @internal
      */
     private sendVoiceUpdate() {
-        this.send({ guild_id: this.guildId, channel_id: this.channelId, self_deaf: this.deafened, self_mute: this.muted });
+        this.send({
+            guild_id: this.guildId,
+            channel_id: this.channelId,
+            self_deaf: this.deafened,
+            self_mute: this.muted,
+        });
     }
 
     /**
@@ -234,7 +262,7 @@ export class Connection extends EventEmitter {
      * @param data The data to send
      * @internal
      */
-    private send(data: any): void {
+    private send(data: unknown): void {
         this.manager.connector.sendPacket(this.shardId, { op: 4, d: data }, false);
     }
 
@@ -243,6 +271,6 @@ export class Connection extends EventEmitter {
      * @internal
      */
     private debug(message: string): void {
-        this.manager.emit('debug', this.constructor.name, message);
+        this.manager.emit("debug", this.constructor.name, message);
     }
 }

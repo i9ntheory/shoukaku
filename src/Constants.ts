@@ -1,32 +1,32 @@
-import Info from '../package.json';
-import { NodeOption, ShoukakuOptions } from './Shoukaku';
+import Info from "../package.json";
+import type { NodeOption, ShoukakuOptions } from "./Shoukaku";
 
 export enum State {
-    CONNECTING,
-    NEARLY,
-    CONNECTED,
-    RECONNECTING,
-    DISCONNECTING,
-    DISCONNECTED
+    CONNECTING = 0,
+    NEARLY = 1,
+    CONNECTED = 2,
+    RECONNECTING = 3,
+    DISCONNECTING = 4,
+    DISCONNECTED = 5,
 }
 
 export enum VoiceState {
-    SESSION_READY,
-    SESSION_ID_MISSING,
-    SESSION_ENDPOINT_MISSING,
-    SESSION_FAILED_UPDATE
+    SESSION_READY = 0,
+    SESSION_ID_MISSING = 1,
+    SESSION_ENDPOINT_MISSING = 2,
+    SESSION_FAILED_UPDATE = 3,
 }
 
 export enum OpCodes {
-    PLAYER_UPDATE = 'playerUpdate',
-    STATS = 'stats',
-    EVENT = 'event',
-    READY = 'ready'
+    PLAYER_UPDATE = "playerUpdate",
+    STATS = "stats",
+    EVENT = "event",
+    READY = "ready",
 }
 
 export enum Versions {
     REST_VERSION = 4,
-    WEBSOCKET_VERSION = 4
+    WEBSOCKET_VERSION = 4,
 }
 
 export const ShoukakuDefaults: Required<ShoukakuOptions> = {
@@ -37,21 +37,22 @@ export const ShoukakuDefaults: Required<ShoukakuOptions> = {
     reconnectInterval: 5,
     restTimeout: 60,
     moveOnDisconnect: false,
-    userAgent: 'Discord Bot/unknown (https://github.com/shipgirlproject/Shoukaku.git)',
+    userAgent: "Discord Bot/unknown (https://github.com/shipgirlproject/Shoukaku.git)",
     structures: {},
     voiceConnectionTimeout: 15,
-    nodeResolver: (nodes) => [ ...nodes.values() ]
-        .filter(node => node.state === State.CONNECTED)
-        .sort((a, b) => a.penalties - b.penalties)
-        .shift()
+    nodeResolver: (nodes) =>
+        [...nodes.values()]
+            .filter((node) => node.state === State.CONNECTED)
+            .sort((a, b) => a.penalties - b.penalties)
+            .shift(),
 };
 
 export const ShoukakuClientInfo = `${Info.name}/${Info.version} (${Info.repository.url})`;
 
 export const NodeDefaults: NodeOption = {
-    name: 'Default',
-    url: '',
-    auth: '',
+    name: "Default",
+    url: "",
+    auth: "",
     secure: false,
-    group: undefined
+    group: undefined,
 };

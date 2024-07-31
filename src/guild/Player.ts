@@ -1,19 +1,19 @@
-import { EventEmitter } from 'events';
-import { Node } from '../node/Node';
-import { Connection } from './Connection';
-import { OpCodes, State, ShoukakuDefaults } from '../Constants';
-import { Exception, Track, UpdatePlayerInfo, UpdatePlayerOptions } from '../node/Rest';
+import type { Node } from "../node/Node";
+import type { Connection } from "./Connection";
+import { type OpCodes, State } from "../Constants";
+import type { Exception, Track, UpdatePlayerInfo, UpdatePlayerOptions } from "../node/Rest";
+import { AsyncEventEmitter } from "@vladfrangu/async_event_emitter";
 
-export type TrackEndReason = 'finished' | 'loadFailed' | 'stopped' | 'replaced' | 'cleanup';
-export type PlayOptions = Omit<UpdatePlayerOptions, 'filters' | 'voice'>;
-export type ResumeOptions = Omit<UpdatePlayerOptions, 'track' | 'filters' | 'voice'>;
+export type TrackEndReason = "finished" | "loadFailed" | "stopped" | "replaced" | "cleanup";
+export type PlayOptions = Omit<UpdatePlayerOptions, "filters" | "voice">;
+export type ResumeOptions = Omit<UpdatePlayerOptions, "track" | "filters" | "voice">;
 
 export enum PlayerEventType {
-    TRACK_START_EVENT = 'TrackStartEvent',
-    TRACK_END_EVENT = 'TrackEndEvent',
-    TRACK_EXCEPTION_EVENT = 'TrackExceptionEvent',
-    TRACK_STUCK_EVENT = 'TrackStuckEvent',
-    WEBSOCKET_CLOSED_EVENT = 'WebSocketClosedEvent',
+    TRACK_START_EVENT = "TrackStartEvent",
+    TRACK_END_EVENT = "TrackEndEvent",
+    TRACK_EXCEPTION_EVENT = "TrackExceptionEvent",
+    TRACK_STUCK_EVENT = "TrackStuckEvent",
+    WEBSOCKET_CLOSED_EVENT = "WebSocketClosedEvent",
 }
 
 export interface Band {
@@ -62,7 +62,7 @@ export interface ChannelMixSettings {
 }
 
 export interface LowPassSettings {
-    smoothing?: number
+    smoothing?: number;
 }
 
 export interface PlayerEvent {
@@ -102,10 +102,10 @@ export interface WebSocketClosedEvent extends PlayerEvent {
 export interface PlayerUpdate {
     op: OpCodes.PLAYER_UPDATE;
     state: {
-      connected: boolean;
-      position: number;
-      time: number;
-      ping: number;
+        connected: boolean;
+        position: number;
+        time: number;
+        ping: number;
     };
     guildId: string;
 }
@@ -113,14 +113,14 @@ export interface PlayerUpdate {
 export interface FilterOptions {
     volume?: number;
     equalizer?: Band[];
-    karaoke?: KaraokeSettings|null;
-    timescale?: TimescaleSettings|null;
-    tremolo?: FreqSettings|null;
-    vibrato?: FreqSettings|null;
-    rotation?: RotationSettings|null;
-    distortion?: DistortionSettings|null;
-    channelMix?: ChannelMixSettings|null;
-    lowPass?: LowPassSettings|null;
+    karaoke?: KaraokeSettings | null;
+    timescale?: TimescaleSettings | null;
+    tremolo?: FreqSettings | null;
+    vibrato?: FreqSettings | null;
+    rotation?: RotationSettings | null;
+    distortion?: DistortionSettings | null;
+    channelMix?: ChannelMixSettings | null;
+    lowPass?: LowPassSettings | null;
 }
 
 export interface PlayerEvents {
@@ -128,37 +128,37 @@ export interface PlayerEvents {
      * Emitted when the current playing track ends
      * @eventProperty
      */
-    'end': [reason: TrackEndEvent];
+    end: [reason: TrackEndEvent];
     /**
      * Emitted when the current playing track gets stuck due to an error
      * @eventProperty
      */
-    'stuck': [data: TrackStuckEvent];
+    stuck: [data: TrackStuckEvent];
     /**
      * Emitted when the current websocket connection is closed
      * @eventProperty
      */
-    'closed': [reason: WebSocketClosedEvent];
+    closed: [reason: WebSocketClosedEvent];
     /**
      * Emitted when a new track starts
      * @eventProperty
      */
-    'start': [data: TrackStartEvent];
+    start: [data: TrackStartEvent];
     /**
      * Emitted when there is an error caused by the current playing track
      * @eventProperty
      */
-    'exception': [reason: TrackExceptionEvent];
+    exception: [reason: TrackExceptionEvent];
     /**
      * Emitted when the library manages to resume the player
      * @eventProperty
      */
-    'resumed': [player: Player];
+    resumed: [player: Player];
     /**
      * Emitted when a playerUpdate even is received from Lavalink
      * @eventProperty
      */
-    'update': [data: PlayerUpdate];
+    update: [data: PlayerUpdate];
 }
 
 export declare interface Player {
@@ -168,11 +168,10 @@ export declare interface Player {
     emit(event: string | symbol, ...args: unknown[]): boolean;
 }
 
-
 /**
  * Wrapper object around Lavalink
  */
-export class Player extends EventEmitter {
+export class Player extends AsyncEventEmitter {
     /**
      * GuildId of this player
      */
@@ -184,7 +183,7 @@ export class Player extends EventEmitter {
     /**
      * Base64 encoded data of the current track
      */
-    public track: string|null;
+    public track: string | null;
     /**
      * Global volume of the player
      */
@@ -226,8 +225,8 @@ export class Player extends EventEmitter {
         return {
             guildId: this.guildId,
             playerOptions: {
-                track: { 
-                    encoded: this.track 
+                track: {
+                    encoded: this.track,
                 },
                 position: this.position,
                 paused: this.paused,
@@ -235,10 +234,10 @@ export class Player extends EventEmitter {
                 voice: {
                     token: connection.serverUpdate!.token,
                     endpoint: connection.serverUpdate!.endpoint,
-                    sessionId: connection.sessionId!
+                    sessionId: connection.sessionId!,
                 },
-                volume: this.volume
-            }
+                volume: this.volume,
+            },
         };
     }
 
@@ -251,18 +250,17 @@ export class Player extends EventEmitter {
         const connection = this.node.manager.connections.get(this.guildId);
         const node = this.node.manager.nodes.get(name!) || this.node.manager.getIdealNode(connection);
 
-        if (!node && ![ ...this.node.manager.nodes.values() ].some(node => node.state === State.CONNECTED))
-            throw new Error('No available nodes to move to');
+        if (!node && ![...this.node.manager.nodes.values()].some((node) => node.state === State.CONNECTED))
+            throw new Error("No available nodes to move to");
 
         if (!node || node.name === this.node.name || node.state !== State.CONNECTED) return false;
 
         let lastNode = this.node.manager.nodes.get(this.node.name);
-        if (!lastNode || lastNode.state !== State.CONNECTED)
-            lastNode = this.node.manager.getIdealNode(connection);
+        if (!lastNode || lastNode.state !== State.CONNECTED) lastNode = this.node.manager.getIdealNode(connection);
 
         await this.destroy();
-        
-        try {   
+
+        try {
             this.node = node;
             await this.resume();
             return true;
@@ -285,7 +283,7 @@ export class Player extends EventEmitter {
      * @param playable Options for playing this track
      * @param noReplace Set it to true if you don't want to replace the currently playing track
      */
-    public playTrack(playerOptions: PlayOptions, noReplace: boolean = false): Promise<void> {
+    public playTrack(playerOptions: PlayOptions, noReplace = false): Promise<void> {
         return this.update(playerOptions, noReplace);
     }
 
@@ -300,7 +298,7 @@ export class Player extends EventEmitter {
      * Pause or unpause the currently playing track
      * @param paused Boolean value to specify whether to pause or unpause the current bot user
      */
-    public setPaused(paused: boolean = true): Promise<void> {
+    public setPaused(paused = true): Promise<void> {
         return this.update({ paused });
     }
 
@@ -324,7 +322,7 @@ export class Player extends EventEmitter {
      * Sets the filter volume of the player
      * @param volume Target volume 0.0-5.0
      */
-    async setFilterVolume(volume: number):  Promise<void> {
+    async setFilterVolume(volume: number): Promise<void> {
         return this.setFilters({ volume });
     }
 
@@ -432,21 +430,17 @@ export class Player extends EventEmitter {
      * @param options An object that conforms to ResumeOptions that specify behavior on resuming
      * @param noReplace Set it to true if you don't want to replace the currently playing track
      */
-    public async resume(options: ResumeOptions = {}, noReplace: boolean = false): Promise<void> {
+    public async resume(options: ResumeOptions = {}, noReplace = false): Promise<void> {
         const data = this.data;
 
-        if (typeof options.position === 'number') 
-            data.playerOptions.position = options.position;
-        if (typeof options.endTime === 'number')
-            data.playerOptions.endTime = options.endTime;
-        if (typeof options.paused === 'boolean')
-            data.playerOptions.paused = options.paused;
-        if (typeof options.volume === 'number')
-            data.playerOptions.volume = options.volume;
+        if (typeof options.position === "number") data.playerOptions.position = options.position;
+        if (typeof options.endTime === "number") data.playerOptions.endTime = options.endTime;
+        if (typeof options.paused === "boolean") data.playerOptions.paused = options.paused;
+        if (typeof options.volume === "number") data.playerOptions.volume = options.volume;
 
         await this.update(data.playerOptions, noReplace);
 
-        this.emit('resumed', this);
+        this.emit("resumed", this);
     }
 
     /**
@@ -454,30 +448,26 @@ export class Player extends EventEmitter {
      * @param playerOptions Options to update the player data
      * @param noReplace Set it to true if you don't want to replace the currently playing track
      */
-    public async update(playerOptions: UpdatePlayerOptions, noReplace: boolean = false): Promise<void> {
+    public async update(playerOptions: UpdatePlayerOptions, noReplace = false): Promise<void> {
         const data = {
             guildId: this.guildId,
             noReplace,
-            playerOptions
-        }
+            playerOptions,
+        };
 
         await this.node.rest.updatePlayer(data);
 
-        if (!noReplace) this.paused = false
+        if (!noReplace) this.paused = false;
 
         if (playerOptions.filters) {
             const filters = { ...this.filters, ...playerOptions.filters };
             this.filters = filters;
         }
 
-        if (typeof playerOptions.track !== 'undefined')
-            this.track = playerOptions.track.encoded || null;
-        if (typeof playerOptions.paused === 'boolean')
-            this.paused = playerOptions.paused;
-        if (typeof playerOptions.volume === 'number')
-            this.volume = playerOptions.volume;
-        if (typeof playerOptions.position === 'number')
-            this.position = playerOptions.position;
+        if (typeof playerOptions.track !== "undefined") this.track = playerOptions.track.encoded || null;
+        if (typeof playerOptions.paused === "boolean") this.paused = playerOptions.paused;
+        if (typeof playerOptions.volume === "number") this.volume = playerOptions.volume;
+        if (typeof playerOptions.position === "number") this.position = playerOptions.position;
     }
 
     /**
@@ -503,9 +493,9 @@ export class Player extends EventEmitter {
                 voice: {
                     token: connection.serverUpdate!.token,
                     endpoint: connection.serverUpdate!.endpoint,
-                    sessionId: connection.sessionId!
-                }
-            }
+                    sessionId: connection.sessionId!,
+                },
+            },
         };
         await this.node.rest.updatePlayer(playerUpdate);
     }
@@ -517,7 +507,7 @@ export class Player extends EventEmitter {
         const { position, ping } = json.state;
         this.position = position;
         this.ping = ping;
-        this.emit('update', json);
+        this.emit("update", json);
     }
 
     /**
@@ -525,29 +515,31 @@ export class Player extends EventEmitter {
      * @param json JSON data from Lavalink
      * @internal
      */
-    public onPlayerEvent(json: TrackStartEvent|TrackEndEvent|TrackStuckEvent|TrackExceptionEvent|WebSocketClosedEvent): void {
+    public onPlayerEvent(
+        json: TrackStartEvent | TrackEndEvent | TrackStuckEvent | TrackExceptionEvent | WebSocketClosedEvent,
+    ): void {
         switch (json.type) {
-            case 'TrackStartEvent':
+            case "TrackStartEvent":
                 if (this.track) this.track = json.track.encoded;
-                this.emit('start', json);
+                this.emit("start", json);
                 break;
-            case 'TrackEndEvent':
-                this.emit('end', json);
+            case "TrackEndEvent":
+                this.emit("end", json);
                 break;
-            case 'TrackStuckEvent':
-                this.emit('stuck', json);
+            case "TrackStuckEvent":
+                this.emit("stuck", json);
                 break;
-            case 'TrackExceptionEvent':
-                this.emit('exception', json);
+            case "TrackExceptionEvent":
+                this.emit("exception", json);
                 break;
-            case 'WebSocketClosedEvent':
-                this.emit('closed', json);
+            case "WebSocketClosedEvent":
+                this.emit("closed", json);
                 break;
             default:
                 this.node.emit(
-                    'debug',
+                    "debug",
                     this.node.name,
-                    `[Player] -> [Node] : Unknown Player Event Type, Data => ${JSON.stringify(json)}`
+                    `[Player] -> [Node] : Unknown Player Event Type, Data => ${JSON.stringify(json)}`,
                 );
         }
     }

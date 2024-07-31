@@ -1,16 +1,16 @@
-import { Node, NodeInfo, Stats } from './Node';
-import { NodeOption } from '../Shoukaku';
-import { Versions } from '../Constants';
-import { FilterOptions } from '../guild/Player';
+import type { Node, NodeInfo, Stats } from "./Node";
+import type { NodeOption } from "../Shoukaku";
+import { Versions } from "../Constants";
+import type { FilterOptions } from "../guild/Player";
 
-export type Severity = 'common' | 'suspicious' | 'fault';
+export type Severity = "common" | "suspicious" | "fault";
 
 export enum LoadType {
-    TRACK = 'track',
-    PLAYLIST = 'playlist',
-    SEARCH = 'search',
-    EMPTY = 'empty',
-    ERROR = 'error'
+    TRACK = "track",
+    PLAYLIST = "playlist",
+    SEARCH = "search",
+    EMPTY = "empty",
+    ERROR = "error",
 }
 
 export interface Track {
@@ -27,7 +27,7 @@ export interface Track {
         artworkUrl?: string;
         isrc?: string;
         sourceName: string;
-    }
+    };
     pluginInfo: unknown;
 }
 
@@ -36,7 +36,7 @@ export interface Playlist {
     info: {
         name: string;
         selectedTrack: number;
-    }
+    };
     pluginInfo: unknown;
     tracks: Track[];
 }
@@ -48,28 +48,28 @@ export interface Exception {
 }
 
 export interface TrackResult {
-    loadType: LoadType.TRACK,
-    data: Track
+    loadType: LoadType.TRACK;
+    data: Track;
 }
 
 export interface PlaylistResult {
-    loadType: LoadType.PLAYLIST,
-    data: Playlist
+    loadType: LoadType.PLAYLIST;
+    data: Playlist;
 }
 
 export interface SearchResult {
-    loadType: LoadType.SEARCH,
-    data: Track[]
+    loadType: LoadType.SEARCH;
+    data: Track[];
 }
 
 export interface EmptyResult {
-    loadType: LoadType.EMPTY,
-    data: {}
+    loadType: LoadType.EMPTY;
+    data: unknown & {};
 }
 
 export interface ErrorResult {
-    loadType: LoadType.ERROR,
-    data: Exception
+    loadType: LoadType.ERROR;
+    data: Exception;
 }
 
 export type LavalinkResponse = TrackResult | PlaylistResult | SearchResult | EmptyResult | ErrorResult;
@@ -81,7 +81,12 @@ export interface Address {
 }
 
 export interface RoutePlanner {
-    class: null | 'RotatingIpRoutePlanner' | 'NanoIpRoutePlanner' | 'RotatingNanoIpRoutePlanner' | 'BalancingIpRoutePlanner';
+    class:
+        | null
+        | "RotatingIpRoutePlanner"
+        | "NanoIpRoutePlanner"
+        | "RotatingNanoIpRoutePlanner"
+        | "BalancingIpRoutePlanner";
     details: null | {
         ipBlock: {
             type: string;
@@ -101,22 +106,22 @@ export interface LavalinkPlayerVoice {
     endpoint: string;
     sessionId: string;
     connected?: boolean;
-    ping?: number
+    ping?: number;
 }
 
-export interface LavalinkPlayerVoiceOptions extends Omit<LavalinkPlayerVoice, 'connected'|'ping'> {}
+export interface LavalinkPlayerVoiceOptions extends Omit<LavalinkPlayerVoice, "connected" | "ping"> {}
 
 export interface LavalinkPlayer {
-    guildId: string,
-    track?: Track,
+    guildId: string;
+    track?: Track;
     volume: number;
     paused: boolean;
-    voice: LavalinkPlayerVoice
-    filters: FilterOptions
+    voice: LavalinkPlayerVoice;
+    filters: FilterOptions;
 }
 
 export interface UpdatePlayerTrackOptions {
-    encoded?: string|null;
+    encoded?: string | null;
     identifier?: string;
     userData?: unknown;
 }
@@ -191,7 +196,7 @@ export class Rest {
      */
     constructor(node: Node, options: NodeOption) {
         this.node = node;
-        this.url = `${options.secure ? 'https' : 'http'}://${options.url}`;
+        this.url = `${options.secure ? "https" : "http"}://${options.url}`;
         this.version = `/v${Versions.REST_VERSION}`;
         this.auth = options.auth;
     }
@@ -207,8 +212,8 @@ export class Rest {
      */
     public resolve(identifier: string): Promise<LavalinkResponse | undefined> {
         const options = {
-            endpoint: '/loadtracks',
-            options: { params: { identifier }}
+            endpoint: "/loadtracks",
+            options: { params: { identifier } },
         };
         return this.fetch(options);
     }
@@ -220,8 +225,8 @@ export class Rest {
      */
     public decode(track: string): Promise<Track | undefined> {
         const options = {
-            endpoint: '/decodetrack',
-            options: { params: { track }}
+            endpoint: "/decodetrack",
+            options: { params: { track } },
         };
         return this.fetch<Track>(options);
     }
@@ -233,9 +238,9 @@ export class Rest {
     public async getPlayers(): Promise<LavalinkPlayer[]> {
         const options = {
             endpoint: `/sessions/${this.sessionId}/players`,
-            options: {}
+            options: {},
         };
-        return await this.fetch<LavalinkPlayer[]>(options) ?? [];
+        return (await this.fetch<LavalinkPlayer[]>(options)) ?? [];
     }
 
     /**
@@ -245,7 +250,7 @@ export class Rest {
     public getPlayer(guildId: string): Promise<LavalinkPlayer | undefined> {
         const options = {
             endpoint: `/sessions/${this.sessionId}/players/${guildId}`,
-            options: {}
+            options: {},
         };
         return this.fetch(options);
     }
@@ -259,11 +264,11 @@ export class Rest {
         const options = {
             endpoint: `/sessions/${this.sessionId}/players/${data.guildId}`,
             options: {
-                method: 'PATCH',
-                params: { noReplace: data.noReplace?.toString() || 'false' },
-                headers: { 'Content-Type': 'application/json' },
-                body: data.playerOptions as Record<string, unknown>
-            }
+                method: "PATCH",
+                params: { noReplace: data.noReplace?.toString() || "false" },
+                headers: { "Content-Type": "application/json" },
+                body: data.playerOptions as Record<string, unknown>,
+            },
         };
         return this.fetch<LavalinkPlayer>(options);
     }
@@ -275,7 +280,7 @@ export class Rest {
     public async destroyPlayer(guildId: string): Promise<void> {
         const options = {
             endpoint: `/sessions/${this.sessionId}/players/${guildId}`,
-            options: { method: 'DELETE' }
+            options: { method: "DELETE" },
         };
         await this.fetch(options);
     }
@@ -290,10 +295,10 @@ export class Rest {
         const options = {
             endpoint: `/sessions/${this.sessionId}`,
             options: {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: { resuming, timeout }
-            }
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: { resuming, timeout },
+            },
         };
         return this.fetch(options);
     }
@@ -304,8 +309,8 @@ export class Rest {
      */
     public stats(): Promise<Stats | undefined> {
         const options = {
-            endpoint: '/stats',
-            options: {}
+            endpoint: "/stats",
+            options: {},
         };
         return this.fetch(options);
     }
@@ -316,8 +321,8 @@ export class Rest {
      */
     public getRoutePlannerStatus(): Promise<RoutePlanner | undefined> {
         const options = {
-            endpoint: '/routeplanner/status',
-            options: {}
+            endpoint: "/routeplanner/status",
+            options: {},
         };
         return this.fetch(options);
     }
@@ -328,12 +333,12 @@ export class Rest {
      */
     public async unmarkFailedAddress(address: string): Promise<void> {
         const options = {
-            endpoint: '/routeplanner/free/address',
+            endpoint: "/routeplanner/free/address",
             options: {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: { address }
-            }
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: { address },
+            },
         };
         await this.fetch(options);
     }
@@ -341,12 +346,12 @@ export class Rest {
     /**
      * Get Lavalink info
      */
-    public getLavalinkInfo(): Promise<NodeInfo|undefined> {
+    public getLavalinkInfo(): Promise<NodeInfo | undefined> {
         const options = {
-            endpoint: '/info',
+            endpoint: "/info",
             options: {
-                headers: { 'Content-Type': 'application/json' }
-            }
+                headers: { "Content-Type": "application/json" },
+            },
         };
         return this.fetch(options);
     }
@@ -360,8 +365,8 @@ export class Rest {
     protected async fetch<T = unknown>(fetchOptions: FetchOptions) {
         const { endpoint, options } = fetchOptions;
         let headers = {
-            'Authorization': this.auth,
-            'User-Agent': this.node.manager.options.userAgent
+            Authorization: this.auth,
+            "User-Agent": this.node.manager.options.userAgent,
         };
 
         if (options.headers) headers = { ...headers, ...options.headers };
@@ -373,31 +378,26 @@ export class Rest {
         const abortController = new AbortController();
         const timeout = setTimeout(() => abortController.abort(), this.node.manager.options.restTimeout * 1000);
 
-        const method = options.method?.toUpperCase() || 'GET';
+        const method = options.method?.toUpperCase() || "GET";
 
         const finalFetchOptions: FinalFetchOptions = {
             method,
             headers,
-            signal: abortController.signal
+            signal: abortController.signal,
         };
 
-        if (![ 'GET', 'HEAD' ].includes(method) && options.body)
-            finalFetchOptions.body = JSON.stringify(options.body);
+        if (!["GET", "HEAD"].includes(method) && options.body) finalFetchOptions.body = JSON.stringify(options.body);
 
-        const request = await fetch(url.toString(), finalFetchOptions)
-            .finally(() => clearTimeout(timeout));
+        const request = await fetch(url.toString(), finalFetchOptions).finally(() => clearTimeout(timeout));
 
         if (!request.ok) {
-            const response = await request
-                .json()
-                .catch(() => null);
-            if (!response?.message)
-                throw new Error(`Rest request failed with response code: ${request.status}`);
-            else
-                throw new Error(`Rest request failed with response code: ${request.status} | message: ${response.message}`);
+            const response = await request.json().catch(() => null);
+            if (!response?.message) throw new Error(`Rest request failed with response code: ${request.status}`);
+
+            throw new Error(`Rest request failed with response code: ${request.status} | message: ${response.message}`);
         }
         try {
-            return await request.json() as T;
+            return (await request.json()) as T;
         } catch {
             return;
         }

@@ -1,11 +1,17 @@
-import { EventEmitter } from 'events';
-import { IncomingMessage } from 'http';
-import { NodeOption, Shoukaku } from '../Shoukaku';
-import { OpCodes, ShoukakuClientInfo, State, Versions } from '../Constants';
-import { wait } from '../Utils';
-import { Rest } from './Rest';
-import { PlayerUpdate, TrackEndEvent, TrackExceptionEvent, TrackStartEvent, TrackStuckEvent, WebSocketClosedEvent } from '../guild/Player';
-import Websocket from 'ws';
+import type { NodeOption, Shoukaku } from "../Shoukaku";
+import { OpCodes, ShoukakuClientInfo, State, Versions } from "../Constants";
+import { wait } from "../Utils";
+import { Rest } from "./Rest";
+import type {
+    PlayerUpdate,
+    TrackEndEvent,
+    TrackExceptionEvent,
+    TrackStartEvent,
+    TrackStuckEvent,
+    WebSocketClosedEvent,
+} from "../guild/Player";
+import Websocket from "ws";
+import { AsyncEventEmitter } from "@vladfrangu/async_event_emitter";
 
 export interface Ready {
     op: OpCodes.READY;
@@ -21,12 +27,12 @@ export interface Stats {
         reservable: number;
         used: number;
         free: number;
-        allocated: number
+        allocated: number;
     };
     frameStats: {
         sent: number;
         deficit: number;
-        nulled: number
+        nulled: number;
     };
     cpu: {
         cores: number;
@@ -43,18 +49,18 @@ export type NodeInfoVersion = {
     patch: number;
     preRelease?: string;
     build?: string;
-}
+};
 
 export type NodeInfoGit = {
     branch: string;
     commit: string;
     commitTime: number;
-}
+};
 
 export type NodeInfoPlugin = {
     name: string;
     version: string;
-}
+};
 
 export type NodeInfo = {
     version: NodeInfoVersion;
@@ -65,23 +71,23 @@ export type NodeInfo = {
     sourceManagers: string[];
     filters: string[];
     plugins: NodeInfoPlugin[];
-}
+};
 
 export interface ResumableHeaders {
     [key: string]: string;
-    'Client-Name': string;
-    'User-Agent': string;
-    'Authorization': string;
-    'User-Id': string;
-    'Session-Id': string;
+    "Client-Name": string;
+    "User-Agent": string;
+    Authorization: string;
+    "User-Id": string;
+    "Session-Id": string;
 }
 
-export interface NonResumableHeaders extends Omit<ResumableHeaders, 'Session-Id'> {}
+export interface NonResumableHeaders extends Omit<ResumableHeaders, "Session-Id"> {}
 
 /**
  * Represents a Lavalink node
  */
-export class Node extends EventEmitter {
+export class Node extends AsyncEventEmitter {
     /**
      * Shoukaku class
      */
@@ -121,19 +127,19 @@ export class Node extends EventEmitter {
     /**
      * Statistics from Lavalink
      */
-    public stats: Stats|null;
+    public stats: Stats | null;
     /**
      * Information about lavalink node
-    */
-    public info: NodeInfo|null;
+     */
+    public info: NodeInfo | null;
     /**
      * Websocket instance
      */
-    public ws: Websocket|null;
+    public ws: Websocket | null;
     /**
      * SessionId of this Lavalink connection (not to be confused with Discord SessionId)
      */
-    public sessionId: string|null;
+    public sessionId: string | null;
     /**
      * Boolean that represents if the node has initialized once
      */
@@ -158,7 +164,7 @@ export class Node extends EventEmitter {
         this.name = options.name;
         this.group = options.group;
         this.version = `/v${Versions.WEBSOCKET_VERSION}`;
-        this.url = `${options.secure ? 'wss' : 'ws'}://${options.url}`;
+        this.url = `${options.secure ? "wss" : "ws"}://${options.url}`;
         this.auth = options.auth;
         this.reconnects = 0;
         this.state = State.DISCONNECTED;
@@ -180,7 +186,7 @@ export class Node extends EventEmitter {
         if (!this.stats) return penalties;
 
         penalties += this.stats.players;
-        penalties += Math.round(Math.pow(1.05, 100 * this.stats.cpu.systemLoad) * 10 - 10);
+        penalties += Math.round(1.05 ** (100 * this.stats.cpu.systemLoad) * 10 - 10);
 
         if (this.stats.frameStats) {
             penalties += this.stats.frameStats.deficit;
@@ -202,28 +208,34 @@ export class Node extends EventEmitter {
      * Connect to Lavalink
      */
     public connect(): void {
-        if (!this.manager.id) throw new Error('Don\'t connect a node when the library is not yet ready');
-        if (this.destroyed) throw new Error('You can\'t re-use the same instance of a node once disconnected, please re-add the node again');
+        if (!this.manager.id) throw new Error("Don't connect a node when the library is not yet ready");
+        if (this.destroyed)
+            throw new Error(
+                "You can't re-use the same instance of a node once disconnected, please re-add the node again",
+            );
 
         this.state = State.CONNECTING;
 
-        const headers: NonResumableHeaders|ResumableHeaders = {
-            'Client-Name': ShoukakuClientInfo,
-            'User-Agent': this.manager.options.userAgent,
-            'Authorization': this.auth,
-            'User-Id': this.manager.id
+        const headers: NonResumableHeaders | ResumableHeaders = {
+            "Client-Name": ShoukakuClientInfo,
+            "User-Agent": this.manager.options.userAgent,
+            Authorization: this.auth,
+            "User-Id": this.manager.id,
         };
 
-        if (this.sessionId) headers['Session-Id'] = this.sessionId;
-        this.emit('debug', `[Socket] -> [${this.name}] : Connecting ${this.url}, Version: ${this.version}, Trying to resume? ${!!this.sessionId}`);
+        if (this.sessionId) headers["Session-Id"] = this.sessionId;
+        this.emit(
+            "debug",
+            `[Socket] -> [${this.name}] : Connecting ${this.url}, Version: ${this.version}, Trying to resume? ${!!this.sessionId}`,
+        );
         if (!this.initialized) this.initialized = true;
 
         const url = new URL(`${this.url}${this.version}/websocket`);
         this.ws = new Websocket(url.toString(), { headers } as Websocket.ClientOptions);
-        this.ws.once('upgrade', response => this.open(response));
-        this.ws.once('close', (...args) => this.close(...args));
-        this.ws.on('error', error => this.error(error));
-        this.ws.on('message', data => this.message(data).catch(error => this.error(error)));
+        this.ws.once("open", (response: unknown) => this.open(response));
+        this.ws.once("close", (...args) => this.close(...args));
+        this.ws.on("error", (error) => this.error(error));
+        this.ws.on("message", (data) => this.message(data).catch((error) => this.error(error)));
     }
 
     /**
@@ -241,9 +253,13 @@ export class Node extends EventEmitter {
      * @param response Response from Lavalink
      * @internal
      */
-    private open(response: IncomingMessage): void {
-        const resumed = response.headers['session-resumed'] === 'true';
-        this.emit('debug', `[Socket] <-> [${this.name}] : Connection Handshake Done! ${this.url} | Upgrade Headers Resumed: ${resumed}`);
+    private open(response: unknown): void {
+        // const resumed = response.headers["session-resumed"] === "true";
+        const resumed = true;
+        this.emit(
+            "debug",
+            `[Socket] <-> [${this.name}] : Connection Handshake Done! ${this.url} | Upgrade Headers Resumed: ${resumed}`,
+        );
         this.reconnects = 0;
         this.state = State.NEARLY;
     }
@@ -254,24 +270,34 @@ export class Node extends EventEmitter {
      * @internal
      */
     private async message(message: unknown): Promise<void> {
-        const json: Ready|Stats|PlayerUpdate|TrackStartEvent|TrackEndEvent|TrackStuckEvent|TrackExceptionEvent|WebSocketClosedEvent = JSON.parse(message as string);
+        const json:
+            | Ready
+            | Stats
+            | PlayerUpdate
+            | TrackStartEvent
+            | TrackEndEvent
+            | TrackStuckEvent
+            | TrackExceptionEvent
+            | WebSocketClosedEvent = JSON.parse(message as string);
         if (!json) return;
-        this.emit('raw', json);
-        switch(json.op) {
+        this.emit("raw", json);
+        switch (json.op) {
             case OpCodes.STATS:
-                this.emit('debug', `[Socket] <- [${this.name}] : Node Status Update | Server Load: ${this.penalties}`);
+                this.emit("debug", `[Socket] <- [${this.name}] : Node Status Update | Server Load: ${this.penalties}`);
                 this.stats = json;
                 break;
-            case OpCodes.READY:
+            case OpCodes.READY: {
                 if (!json.sessionId) {
-                    this.emit('debug', `[Socket] -> [${this.name}] : No session id found from ready op? disconnecting and reconnecting to avoid issues`);
+                    this.emit(
+                        "debug",
+                        `[Socket] -> [${this.name}] : No session id found from ready op? disconnecting and reconnecting to avoid issues`,
+                    );
                     return this.internalDisconnect(1000);
                 }
 
                 this.sessionId = json.sessionId;
-
-                const players = [ ...this.manager.players.values() ].filter(player => player.node.name === this.name);
-                const resumeByLibrary = this.initialized && (players.length && this.manager.options.resumeByLibrary);
+                const players = [...this.manager.players.values()].filter((player) => player.node.name === this.name);
+                const resumeByLibrary = this.initialized && players.length && this.manager.options.resumeByLibrary;
 
                 if (!json.resumed && resumeByLibrary) {
                     try {
@@ -282,25 +308,28 @@ export class Node extends EventEmitter {
                 }
 
                 this.state = State.CONNECTED;
-                this.emit('debug', `[Socket] -> [${this.name}] : Lavalink is ready! | Lavalink resume: ${json.resumed} | Lib resume: ${!!resumeByLibrary}`);
-                this.emit('ready', json.resumed || resumeByLibrary);
+                this.emit(
+                    "debug",
+                    `[Socket] -> [${this.name}] : Lavalink is ready! | Lavalink resume: ${json.resumed} | Lib resume: ${!!resumeByLibrary}`,
+                );
+                this.emit("ready", json.resumed || resumeByLibrary);
 
                 if (this.manager.options.resume) {
                     await this.rest.updateSession(this.manager.options.resume, this.manager.options.resumeTimeout);
-                    this.emit('debug', `[Socket] -> [${this.name}] : Resuming configured!`);
+                    this.emit("debug", `[Socket] -> [${this.name}] : Resuming configured!`);
                 }
                 break;
+            }
             case OpCodes.EVENT:
-            case OpCodes.PLAYER_UPDATE:
+            case OpCodes.PLAYER_UPDATE: {
                 const player = this.manager.players.get(json.guildId);
                 if (!player) return;
-                if (json.op === OpCodes.EVENT)
-                    player.onPlayerEvent(json);
-                else
-                    player.onPlayerUpdate(json);
+                if (json.op === OpCodes.EVENT) player.onPlayerEvent(json);
+                else player.onPlayerUpdate(json);
                 break;
+            }
             default:
-                this.emit('debug', `[Player] -> [Node] : Unknown Message Op, Data => ${JSON.stringify(json)}`);
+                this.emit("debug", `[Player] -> [Node] : Unknown Message Op, Data => ${JSON.stringify(json)}`);
         }
     }
 
@@ -310,20 +339,18 @@ export class Node extends EventEmitter {
      * @param reason Reason for connection close
      */
     private close(code: number, reason: unknown): void {
-        this.emit('debug', `[Socket] <-/-> [${this.name}] : Connection Closed, Code: ${code || 'Unknown Code'}`);
-        this.emit('close', code, reason);
-        if (this.shouldClean)
-            this.clean();
-        else
-            this.reconnect();
+        this.emit("debug", `[Socket] <-/-> [${this.name}] : Connection Closed, Code: ${code || "Unknown Code"}`);
+        this.emit("close", code, reason);
+        if (this.shouldClean) this.clean();
+        else this.reconnect();
     }
 
     /**
      * To emit error events easily
      * @param error error message
      */
-    public error(error: Error|unknown): void {
-        this.emit('error', error);
+    public error(error: Error | unknown): void {
+        this.emit("error", error);
     }
 
     /**
@@ -335,25 +362,23 @@ export class Node extends EventEmitter {
 
         this.state = State.DISCONNECTING;
 
-        if (this.ws)
-            this.ws.close(code, reason);
-        else
-            this.clean();
+        if (this.ws) this.ws.close(code, reason);
+        else this.clean();
     }
 
     /**
      * Destroys the websocket connection
      * @internal
      */
-    private destroy(count: number = 0): void {
-        this.ws?.removeAllListeners();
+    private destroy(count = 0): void {
+        this.ws?.terminate();
         this.ws?.close();
         this.ws = null;
         this.sessionId = null;
         this.state = State.DISCONNECTED;
         if (!this.shouldClean) return;
         this.destroyed = true;
-        this.emit('disconnect', count);
+        this.emit("disconnect", count);
     }
 
     /**
@@ -382,8 +407,15 @@ export class Node extends EventEmitter {
         if (this.state !== State.DISCONNECTED) this.destroy();
         this.state = State.RECONNECTING;
         this.reconnects++;
-        this.emit('reconnecting', this.manager.options.reconnectTries - this.reconnects, this.manager.options.reconnectInterval);
-        this.emit('debug', `[Socket] -> [${this.name}] : Reconnecting in ${this.manager.options.reconnectInterval} seconds. ${this.manager.options.reconnectTries - this.reconnects} tries left`);
+        this.emit(
+            "reconnecting",
+            this.manager.options.reconnectTries - this.reconnects,
+            this.manager.options.reconnectInterval,
+        );
+        this.emit(
+            "debug",
+            `[Socket] -> [${this.name}] : Reconnecting in ${this.manager.options.reconnectInterval} seconds. ${this.manager.options.reconnectTries - this.reconnects} tries left`,
+        );
         await wait(this.manager.options.reconnectInterval * 1000);
         this.connect();
     }
@@ -398,15 +430,13 @@ export class Node extends EventEmitter {
 
         for (const player of this.manager.players.values()) {
             const serverUpdate = this.manager.connections.get(player.guildId)?.serverUpdate;
-            if (serverUpdate)
-                playersWithData.push(player);
-            else
-                playersWithoutData.push(player);
+            if (serverUpdate) playersWithData.push(player);
+            else playersWithoutData.push(player);
         }
 
         await Promise.allSettled([
-            ...playersWithData.map(player => player.resume()),
-            ...playersWithoutData.map(player => this.manager.leaveVoiceChannel(player.guildId))
+            ...playersWithData.map((player) => player.resume()),
+            ...playersWithoutData.map((player) => this.manager.leaveVoiceChannel(player.guildId)),
         ]);
     }
 
@@ -415,8 +445,8 @@ export class Node extends EventEmitter {
      * @internal
      */
     private async movePlayers(): Promise<number> {
-        const players = [ ...this.manager.players.values() ];
-        const data = await Promise.allSettled(players.map(player => player.move()));
-        return data.filter(results => results.status === 'fulfilled').length;
+        const players = [...this.manager.players.values()];
+        const data = await Promise.allSettled(players.map((player) => player.move()));
+        return data.filter((results) => results.status === "fulfilled").length;
     }
 }

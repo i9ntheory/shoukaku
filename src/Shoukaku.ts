@@ -1,17 +1,17 @@
-import { EventEmitter } from 'events';
-import { ShoukakuDefaults, VoiceState } from './Constants';
-import { Node } from './node/Node';
-import { Connector } from './connectors/Connector';
-import { Constructor, mergeDefault } from './Utils';
-import { Player } from './guild/Player';
-import { Rest } from './node/Rest';
-import { Connection } from './guild/Connection.js';
+import { ShoukakuDefaults, VoiceState } from "./Constants";
+import { Node } from "./node/Node";
+import type { Connector } from "./connectors/Connector";
+import { type Constructor, mergeDefault } from "./Utils";
+import { Player } from "./guild/Player";
+import type { Rest } from "./node/Rest";
+import { Connection } from "./guild/Connection.js";
+import { AsyncEventEmitter } from "@vladfrangu/async_event_emitter";
 
 export interface Structures {
     /**
      * A custom structure that extends the Rest class
      */
-    rest?:  Constructor<Rest>;
+    rest?: Constructor<Rest>;
     /**
      * A custom structure that extends the Player class
      */
@@ -85,7 +85,7 @@ export interface ShoukakuOptions {
     /**
      * Node Resolver to use if you want to customize it
      */
-    nodeResolver?: (nodes: Map<string, Node>, connection?: Connection) => Node|undefined;
+    nodeResolver?: (nodes: Map<string, Node>, connection?: Connection) => Node | undefined;
 }
 
 export interface VoiceChannelOptions {
@@ -101,50 +101,50 @@ export interface ShoukakuEvents {
      * Emitted when reconnect tries are occurring and how many tries are left
      * @eventProperty
      */
-    'reconnecting': [name: string, reconnectsLeft: number, reconnectInterval: number];
+    reconnecting: [name: string, reconnectsLeft: number, reconnectInterval: number];
     /**
      * Emitted when data useful for debugging is produced
      * @eventProperty
      */
-    'debug': [name: string, info: string];
+    debug: [name: string, info: string];
     /**
      * Emitted when an error occurs
      * @eventProperty
      */
-    'error': [name: string, error: Error];
+    error: [name: string, error: Error];
     /**
      * Emitted when Shoukaku is ready to receive operations
      * @eventProperty
      */
-    'ready': [name: string, reconnected: boolean];
+    ready: [name: string, reconnected: boolean];
     /**
      * Emitted when a websocket connection to Lavalink closes
      * @eventProperty
      */
-    'close': [name: string, code: number, reason: string];
+    close: [name: string, code: number, reason: string];
     /**
      * Emitted when a websocket connection to Lavalink disconnects
      * @eventProperty
      */
-    'disconnect': [name: string, count: number];
+    disconnect: [name: string, count: number];
     /**
      * Emitted when a raw message is received from Lavalink
      * @eventProperty
      */
-    'raw': [name: string, json: unknown];
+    raw: [name: string, json: unknown];
 }
 
-export declare interface Shoukaku {
+export declare interface ShoukakuInter {
     on<K extends keyof ShoukakuEvents>(event: K, listener: (...args: ShoukakuEvents[K]) => void): this;
     once<K extends keyof ShoukakuEvents>(event: K, listener: (...args: ShoukakuEvents[K]) => void): this;
     off<K extends keyof ShoukakuEvents>(event: K, listener: (...args: ShoukakuEvents[K]) => void): this;
-    emit(event: string | symbol, ...args: any[]): boolean;
+    emit(event: string | symbol, ...args: unknown[]): boolean;
 }
 
 /**
  * Main Shoukaku class
  */
-export class Shoukaku extends EventEmitter {
+export class Shoukaku extends AsyncEventEmitter {
     /**
      * Discord library connector
      */
@@ -168,7 +168,7 @@ export class Shoukaku extends EventEmitter {
     /**
      * Shoukaku instance identifier
      */
-    public id: string|null;
+    public id: string | null;
     /**
      * @param connector A Discord library connector
      * @param nodes An array that conforms to the NodeOption type that specifies nodes to connect to
@@ -214,13 +214,13 @@ export class Shoukaku extends EventEmitter {
      */
     public addNode(options: NodeOption): void {
         const node = new Node(this, options);
-        node.on('debug', (...args) => this.emit('debug', node.name, ...args));
-        node.on('reconnecting', (...args) => this.emit('reconnecting', node.name, ...args));
-        node.on('error', (...args) => this.emit('error', node.name, ...args));
-        node.on('close', (...args) => this.emit('close', node.name, ...args));
-        node.on('ready', (...args) => this.emit('ready', node.name, ...args));
-        node.on('raw', (...args) => this.emit('raw', node.name, ...args));
-        node.once('disconnect', (...args) => this.clean(node, ...args));
+        node.on("debug", (...args) => this.emit("debug", node.name, ...args));
+        node.on("reconnecting", (...args) => this.emit("reconnecting", node.name, ...args));
+        node.on("error", (...args) => this.emit("error", node.name, ...args));
+        node.on("close", (...args) => this.emit("close", node.name, ...args));
+        node.on("ready", (...args) => this.emit("ready", node.name, ...args));
+        node.on("raw", (...args) => this.emit("raw", node.name, ...args));
+        node.once("disconnect", (...args) => this.clean(node, ...args));
         node.connect();
         this.nodes.set(node.name, node);
     }
@@ -230,9 +230,9 @@ export class Shoukaku extends EventEmitter {
      * @param name Name of the node
      * @param reason Reason of removing the node
      */
-    public removeNode(name: string, reason = 'Remove node executed'): void {
+    public removeNode(name: string, reason = "Remove node executed"): void {
         const node = this.nodes.get(name);
-        if (!node) throw new Error('The node name you specified doesn\'t exist');
+        if (!node) throw new Error("The node name you specified doesn't exist");
         node.disconnect(1000, reason);
     }
 
@@ -246,31 +246,42 @@ export class Shoukaku extends EventEmitter {
      * @returns The created player
      */
     public async joinVoiceChannel(options: VoiceChannelOptions): Promise<Player> {
-        if (this.connections.has(options.guildId))
-            throw new Error('This guild already have an existing connection');
+        if (this.connections.has(options.guildId)) {
+            throw new Error("This guild already have an existing connection");
+        }
+
         const connection = new Connection(this, options);
         this.connections.set(connection.guildId, connection);
+
         try {
             await connection.connect();
         } catch (error) {
             this.connections.delete(options.guildId);
             throw error;
         }
+
         try {
             const node = this.getIdealNode(connection);
-            if (!node)
-                throw new Error('Can\'t find any nodes to connect on');
-            const player = this.options.structures.player ? new this.options.structures.player(connection.guildId, node) : new Player(connection.guildId, node);
+
+            if (!node) throw new Error("Can't find any nodes to connect on");
+
+            const player = this.options.structures.player
+                ? new this.options.structures.player(connection.guildId, node)
+                : new Player(connection.guildId, node);
+
             const onUpdate = (state: VoiceState) => {
                 if (state !== VoiceState.SESSION_READY) return;
                 player.sendServerUpdate(connection);
             };
+
             await player.sendServerUpdate(connection);
-            connection.on('connectionUpdate', onUpdate);
+            connection.on("connectionUpdate", onUpdate);
             this.players.set(player.guildId, player);
+
             return player;
         } catch (error) {
             connection.disconnect();
+
             this.connections.delete(options.guildId);
             throw error;
         }
@@ -291,7 +302,9 @@ export class Shoukaku extends EventEmitter {
         if (player) {
             try {
                 await player.destroy();
-            } catch (_) { /* empty */ }
+            } catch (_) {
+                /* empty */
+            }
             player.clean();
             this.players.delete(guildId);
         }
@@ -307,6 +320,6 @@ export class Shoukaku extends EventEmitter {
     private clean(node: Node, ...args: unknown[]): void {
         node.removeAllListeners();
         this.nodes.delete(node.name);
-        this.emit('disconnect', node.name, ...args);
+        this.emit("disconnect", node.name, ...args);
     }
 }
